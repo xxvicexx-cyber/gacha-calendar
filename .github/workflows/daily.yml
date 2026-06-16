@@ -31,11 +31,12 @@ jobs:
           key: gacha-db-${{ github.run_id }}
           restore-keys: gacha-db-
 
-      - name: Run pipeline
+      - name: Run pipeline (scrape + Discord + site data)
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
           MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
+          X_COOKIES: ${{ secrets.X_COOKIES }}
         run: python run.py
 
       - name: Set up Node.js
@@ -51,12 +52,13 @@ jobs:
         working-directory: site
         run: npm run build
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy site/dist --project-name=gacha-calendar --commit-dirty=true
+      - name: Deploy to Vercel
+        working-directory: site
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel deploy dist --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Notify Discord on failure
         if: failure()
@@ -67,5 +69,5 @@ jobs:
           import os, httpx
           url = os.environ.get('DISCORD_WEBHOOK_URL', '')
           if url:
-              httpx.post(url, json={'content': '⚠️ gacha-calendar: GitHub Actions failed! Check logs.'})
+              httpx.post(url, json={'content': '⚠️ gacha-calendar: GitHub Actions failed!'})
           "

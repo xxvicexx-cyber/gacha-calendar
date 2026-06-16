@@ -2,7 +2,7 @@
 """メインパイプライン: 収集 → 正規化 → DB保存 → 速報配信 → サイトデータ生成。
 
 Usage:
-  python run.py [--skip-scrape] [--skip-notify] [--skip-site]
+  python run.py [--skip-scrape] [--skip-notify] [--skip-site] [--skip-x]
 """
 import argparse
 import sys
@@ -25,6 +25,8 @@ from store.db import (
     get_unposted, mark_posted, get_products_by_month, get_months,
 )
 from distribute.discord import post_to_discord, CHANNEL
+from distribute.discord import CHANNEL as DISCORD_CHANNEL
+X_CHANNEL = "x"
 
 
 def process_items(raw_items: list[dict], conn) -> list[tuple]:
@@ -67,6 +69,7 @@ def main():
     parser.add_argument("--skip-scrape", action="store_true")
     parser.add_argument("--skip-notify", action="store_true")
     parser.add_argument("--skip-site", action="store_true")
+    parser.add_argument("--skip-x", action="store_true")
     parser.add_argument("--months-ahead", type=int, default=5)
     args = parser.parse_args()
 
@@ -115,7 +118,27 @@ def main():
         else:
             print("No new items to notify")
 
-    # --- 3. Generate site data ---
+    # --- 3. X 自動投稿 ---
+    if not args.skip_x:
+        import os
+        if os.environ.get("X_COOKIES") or (Path("data/x_cookies.json")).exists():
+            print("=== Posting to X ===")
+            from distribute.x_poster import post_to_x
+            from store.db import get_unposted, mark_posted
+            unposted_x = get_unposted(conn, X_CHANNEL)
+            if unposted_x:
+                x_list = [dict(row) for row in unposted_x]
+                x_posted = post_to_x(x_list)
+                print(f"Posted {x_posted} items to X")
+                with conn:
+                    for row in unposted_x[:x_posted]:
+                        mark_posted(conn, row["id"], X_CHANNEL)
+            else:
+                print("No new items to post to X")
+        else:
+            print("=== Skipping X (no cookies) ===")
+
+    # --- 4. Generate site data ---
     if not args.skip_site:
         print("=== Generating site data ===")
         generate_site_data(conn)
