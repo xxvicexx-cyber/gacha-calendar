@@ -70,39 +70,76 @@ def _normalize_cookie(c: dict) -> dict:
     return normalized
 
 
+_X_LIMIT = 270          # 安全マージンを取った上限（Xの制限は280）
+_URL_WEIGHT = 23        # XはURLを常に23文字換算（t.co短縮）
+_NAME_MAX = 30          # 商品名の最大表示文字数
+
+
+def _x_len(text: str) -> int:
+    """X の文字数カウント: URL は 23文字固定、それ以外は文字数そのまま。"""
+    import re
+    url_pattern = re.compile(r"https?://\S+")
+    urls = url_pattern.findall(text)
+    no_url = url_pattern.sub("", text)
+    return len(no_url) + len(urls) * _URL_WEIGHT
+
+
+def _truncate(name: str, max_len: int = _NAME_MAX) -> str:
+    return name[:max_len] + "…" if len(name) > max_len else name
+
+
 def _build_tweet_text(product: dict, with_affiliate: bool = True) -> str:
-    """投稿テキストを組み立てる。"""
-    name = product.get("clean_name") or product.get("name", "")
-    maker = product.get("maker", "")
+    """280文字制限を守りながらツイートを組み立てる。
+
+    優先度: 商品名＋価格＋発売日 > アフィリエイトURL > ハッシュタグ > Discord招待
+    """
+    name = _truncate(product.get("clean_name") or product.get("name", ""))
     price = product.get("play_price")
     release_date = product.get("release_date") or product.get("release_month", "")
     ip_tag = product.get("ip_tag", "")
     amazon_url = product.get("amazon_url", "")
     is_reprint = product.get("is_reprint", False)
 
-    lines = []
-    if is_reprint:
-        lines.append("【再販】")
-    lines.append(f"🎰 {name}")
-    if maker:
-        lines.append(f"メーカー: {maker}")
+    # --- 必須ブロック（常に含める）---
+    head = ("【再販】" if is_reprint else "") + f"🎰 {name}"
+    meta_parts = []
     if release_date:
-        lines.append(f"発売: {release_date}")
+        meta_parts.append(f"📅 {release_date}")
     if price:
-        lines.append(f"1回: {price}円")
+        meta_parts.append(f"💴 {price}円")
+    meta = "　".join(meta_parts)
 
-    hashtags = ["#ガチャガチャ", "#カプセルトイ"]
+    base = f"{head}\n{meta}" if meta else head
+
+    # --- オプションブロック（文字数が許す範囲で追加）---
+    hashtags = "#ガチャガチャ #カプセルトイ"
     if ip_tag:
-        hashtags.append(f"#{ip_tag.replace(' ', '')}")
-    lines.append(" ".join(hashtags))
+        hashtags += f" #{ip_tag.replace(' ', '')}"
 
-    if with_affiliate and amazon_url:
-        lines.append(f"\n🛒 Amazonで探す（PR）\n{amazon_url}")
+    affiliate_line = f"🛒 Amazon（PR）\n{amazon_url}" if (with_affiliate and amazon_url) else ""
+    discord_line = f"💬 Discord\n{DISCORD_INVITE}" if DISCORD_INVITE else ""
 
-    if DISCORD_INVITE:
-        lines.append(f"\n💬 速報・情報交換はDiscordで！\n{DISCORD_INVITE}")
+    # 優先度順に追加し、超えたら省略
+    candidates = [
+        ("affiliate", f"\n{affiliate_line}"),
+        ("hashtags",  f"\n{hashtags}"),
+        ("discord",   f"\n{discord_line}"),
+    ]
 
-    return "\n".join(lines)
+    result = base
+    for key, block in candidates:
+        if not block.strip():
+            continue
+        if _x_len(result + block) <= _X_LIMIT:
+            result += block
+        else:
+            # hashtags だけは短縮版で再挑戦
+            if key == "hashtags":
+                short = "\n#ガチャガチャ"
+                if _x_len(result + short) <= _X_LIMIT:
+                    result += short
+
+    return result
 
 
 def _check_login(page) -> bool:
