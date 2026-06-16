@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 COOKIE_FILE = Path(os.environ.get("X_COOKIE_FILE", "data/x_cookies.json"))
+DISCORD_INVITE = os.environ.get("DISCORD_INVITE_URL", "")
 CHANNEL = "x"
 MAX_POSTS_PER_RUN = 5
 POST_INTERVAL_MIN = 60   # seconds between posts
@@ -89,13 +90,17 @@ def _build_tweet_text(product: dict, with_affiliate: bool = True) -> str:
         lines.append(f"発売: {release_date}")
     if price:
         lines.append(f"1回: {price}円")
-    if ip_tag:
-        lines.append(f"#{ip_tag}")
 
-    lines.append("#ガチャガチャ #カプセルトイ")
+    hashtags = ["#ガチャガチャ", "#カプセルトイ"]
+    if ip_tag:
+        hashtags.append(f"#{ip_tag.replace(' ', '')}")
+    lines.append(" ".join(hashtags))
 
     if with_affiliate and amazon_url:
-        lines.append(f"\nAmazonで探す👇（PR）\n{amazon_url}")
+        lines.append(f"\n🛒 Amazonで探す（PR）\n{amazon_url}")
+
+    if DISCORD_INVITE:
+        lines.append(f"\n💬 速報・情報交換はDiscordで！\n{DISCORD_INVITE}")
 
     return "\n".join(lines)
 

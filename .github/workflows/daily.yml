@@ -9,8 +9,6 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -31,34 +29,14 @@ jobs:
           key: gacha-db-${{ github.run_id }}
           restore-keys: gacha-db-
 
-      - name: Run pipeline (scrape + Discord + site data)
+      - name: Run pipeline (scrape + Discord + X投稿)
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_INVITE_URL: ${{ secrets.DISCORD_INVITE_URL }}
           AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
           MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
           X_COOKIES: ${{ secrets.X_COOKIES }}
-        run: python run.py
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Astro deps
-        working-directory: site
-        run: npm install
-
-      - name: Build site
-        working-directory: site
-        run: npm run build
-
-      - name: Deploy to Vercel
-        working-directory: site
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel deploy dist --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        run: python run.py --skip-site
 
       - name: Notify Discord on failure
         if: failure()
