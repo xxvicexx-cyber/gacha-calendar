@@ -1,0 +1,73 @@
+name: Daily gacha calendar update
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 09:00 JST
+    - cron: '0 10 * * *'  # 19:00 JST
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Restore DB cache
+        uses: actions/cache@v4
+        with:
+          path: data/gacha.db
+          key: gacha-db-${{ github.run_id }}
+          restore-keys: gacha-db-
+
+      - name: Run pipeline
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
+          MOSHIMO_AFFILIATE_ID: ${{ secrets.MOSHIMO_AFFILIATE_ID }}
+        run: python run.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install Astro deps
+        working-directory: site
+        run: npm ci
+
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy site/dist --project-name=gacha-calendar --commit-dirty=true
+
+      - name: Notify Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python -c "
+          import os, httpx
+          url = os.environ.get('DISCORD_WEBHOOK_URL', '')
+          if url:
+              httpx.post(url, json={'content': '⚠️ gacha-calendar: GitHub Actions failed! Check logs.'})
+          "

@@ -1,0 +1,54 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = 'ガチャガチャ・食玩の発売カレンダー速報サイト' } = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    header {
+      background: #e74c3c;
+      color: white;
+      padding: 1rem 1.5rem;
+    }
+    header a { color: white; text-decoration: none; }
+    header h1 { font-size: 1.4rem; }
+    nav { background: #c0392b; padding: 0.5rem 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    nav a { color: white; text-decoration: none; font-size: 0.9rem; opacity: 0.85; }
+    nav a:hover { opacity: 1; }
+    main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+    footer { text-align: center; padding: 2rem; font-size: 0.8rem; color: #888; margin-top: 3rem; }
+    footer a { color: #888; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/"><h1>🎰 ガチャガチャ発売カレンダー</h1></a>
+  </header>
+  <nav>
+    <a href="/">トップ</a>
+    <a href="/about">このサイトについて</a>
+  </nav>
+  <main>
+    <slot />
+  </main>
+  <footer>
+    <p>当サイトはアフィリエイト広告（Amazon・楽天）を掲載しています。<br>
+    発売情報は<a href="https://www.a-muzu.com/" target="_blank" rel="noopener">あミューズ</a>等の公開情報を元に作成。実際の発売日はメーカー・販売店でご確認ください。</p>
+  </footer>
+</body>
+</html>

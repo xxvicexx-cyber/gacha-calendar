@@ -1,0 +1,40 @@
+---
+import Layout from '../layouts/Layout.astro';
+import indexData from '../data/index.json';
+
+const months = indexData.months ?? [];
+const generatedAt = indexData.generated_at ?? '';
+
+function monthLabel(m: string) {
+  const [y, mo] = m.split('-');
+  return `${y}年${parseInt(mo)}月`;
+}
+---
+<Layout title="ガチャガチャ発売カレンダー | 最新ガチャ情報まとめ">
+  <h2 style="margin-bottom: 1rem; font-size: 1.3rem;">📅 月別発売カレンダー</h2>
+  <p style="margin-bottom: 1.5rem; color: #666; font-size: 0.9rem;">
+    最終更新: {generatedAt ? new Date(generatedAt).toLocaleDateString('ja-JP') : '—'}
+  </p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+    {months.map(({ month, count }) => (
+      <a href={`/${month}/`} style="
+        background: white;
+        border-radius: 8px;
+        padding: 1.2rem;
+        text-decoration: none;
+        color: #333;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        display: block;
+        transition: box-shadow 0.2s;
+      ">
+        <div style="font-size: 1.1rem; font-weight: bold; color: #e74c3c;">{monthLabel(month)}</div>
+        <div style="margin-top: 0.3rem; color: #666; font-size: 0.9rem;">{count}件</div>
+      </a>
+    ))}
+  </div>
+
+  {months.length === 0 && (
+    <p style="color: #888;">データがまだありません。スクレイパーを実行してください。</p>
+  )}
+</Layout>

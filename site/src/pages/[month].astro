@@ -1,0 +1,149 @@
+---
+import Layout from '../layouts/Layout.astro';
+import indexData from '../data/index.json';
+
+export async function getStaticPaths() {
+  const months = indexData.months ?? [];
+  return await Promise.all(
+    months.map(async ({ month }) => {
+      const data = await import(`../data/${month}.json`);
+      return {
+        params: { month },
+        props: { products: data.default, month },
+      };
+    })
+  );
+}
+
+const { products, month } = Astro.props;
+
+function monthLabel(m: string) {
+  const [y, mo] = m.split('-');
+  return `${y}年${parseInt(mo)}月`;
+}
+
+function priceLabel(price: number | null) {
+  return price ? `${price}円` : '—';
+}
+
+const byDate: Record<string, typeof products> = {};
+for (const p of products) {
+  const key = p.release_date ?? p.release_month ?? '未定';
+  if (!byDate[key]) byDate[key] = [];
+  byDate[key].push(p);
+}
+const sortedDates = Object.keys(byDate).sort();
+---
+
+<Layout
+  title={`${monthLabel(month)} ガチャガチャ発売予定一覧`}
+  description={`${monthLabel(month)}に発売予定のカプセルトイ・食玩 ${products.length}件の情報をまとめました。`}
+>
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
+    <h2 style="font-size: 1.3rem;">🗓️ {monthLabel(month)} 発売予定 ({products.length}件)</h2>
+    <a href="/" style="color: #e74c3c; text-decoration: none; font-size: 0.9rem;">← 月一覧へ</a>
+  </div>
+
+  {sortedDates.map(dateKey => (
+    <section style="margin-bottom: 2rem;">
+      <h3 style="
+        font-size: 1rem;
+        font-weight: bold;
+        padding: 0.4rem 0.8rem;
+        background: #e74c3c;
+        color: white;
+        border-radius: 4px;
+        margin-bottom: 0.8rem;
+        display: inline-block;
+      ">
+        {dateKey.includes('-') && dateKey.length === 10
+          ? new Date(dateKey + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })
+          : dateKey}
+      </h3>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+        {byDate[dateKey].map(p => (
+          <div style="
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          ">
+            {p.image_url && (
+              <div style="background: #f0f0f0; text-align: center; padding: 0.5rem; height: 160px; display: flex; align-items: center; justify-content: center;">
+                <img
+                  src={p.image_url}
+                  alt={p.clean_name}
+                  style="max-height: 140px; max-width: 100%; object-fit: contain;"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            <div style="padding: 0.8rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
+              <div style="font-size: 0.75rem; color: #e74c3c; font-weight: bold;">
+                {p.maker ?? '—'}
+                {p.ip_tag && <span style="margin-left: 0.4rem; background: #fff3cd; color: #856404; padding: 0 0.3rem; border-radius: 3px; font-size: 0.7rem;">{p.ip_tag}</span>}
+              </div>
+
+              <a
+                href={p.detail_url ?? '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                style="font-size: 0.9rem; font-weight: bold; color: #333; text-decoration: none; line-height: 1.4;"
+              >
+                {p.clean_name || p.name}
+              </a>
+
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.2rem;">
+                <span style="background: #f8f0ff; color: #6f42c1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; font-weight: bold;">
+                  {priceLabel(p.play_price)}
+                </span>
+                {p.is_reprint && (
+                  <span style="background: #e8f4fd; color: #0969da; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem;">再販</span>
+                )}
+                {p.overseas_ng && (
+                  <span style="background: #fff0f0; color: #cf222e; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem;">海外NG</span>
+                )}
+              </div>
+
+              {(p.amazon_url || p.rakuten_url) && (
+                <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem;">
+                  {p.amazon_url && (
+                    <a
+                      href={p.amazon_url}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      style="
+                        flex: 1; text-align: center; background: #FF9900; color: white;
+                        padding: 0.35rem; border-radius: 4px; text-decoration: none;
+                        font-size: 0.8rem; font-weight: bold;
+                      "
+                    >Amazon PR</a>
+                  )}
+                  {p.rakuten_url && (
+                    <a
+                      href={p.rakuten_url}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      style="
+                        flex: 1; text-align: center; background: #bf0000; color: white;
+                        padding: 0.35rem; border-radius: 4px; text-decoration: none;
+                        font-size: 0.8rem; font-weight: bold;
+                      "
+                    >楽天 PR</a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  {products.length === 0 && (
+    <p style="color: #888;">この月のデータはまだありません。</p>
+  )}
+</Layout>

@@ -1,0 +1,12 @@
+.env
+/data/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+node_modules/
+site/dist/
+site/.astro/
+*.db
+*.db-wal
+*.db-shm
