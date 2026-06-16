@@ -44,21 +44,22 @@ def _build_embed(product: dict, is_new: bool, changes: list[str]) -> dict:
     if product.get("release_text"):
         desc_parts.append(f"備考: {product['release_text']}")
 
+    # アフィリエイトリンクを description に直接埋め込む（タイトルは非リンク）
+    affiliate_lines = []
+    if product.get("amazon_url"):
+        affiliate_lines.append(f"🛒 [Amazonで探す（PR）]({product['amazon_url']})")
+    if product.get("rakuten_url"):
+        affiliate_lines.append(f"🛒 [楽天で探す（PR）]({product['rakuten_url']})")
+    if affiliate_lines:
+        desc_parts.append("")
+        desc_parts.extend(affiliate_lines)
+
     embed = {
         "title": title,
         "description": "\n".join(desc_parts),
         "color": color,
-        "url": product.get("detail_url") or "",
+        # url は設定しない → タイトルをクリックしても a-muzu に飛ばない
     }
-
-    if product.get("amazon_url"):
-        embed["fields"] = [
-            {"name": "Amazon", "value": f"[検索]({product['amazon_url']})", "inline": True},
-        ]
-        if product.get("rakuten_url"):
-            embed["fields"].append(
-                {"name": "楽天", "value": f"[検索]({product['rakuten_url']})", "inline": True}
-            )
 
     if product.get("image_url"):
         embed["thumbnail"] = {"url": product["image_url"]}
