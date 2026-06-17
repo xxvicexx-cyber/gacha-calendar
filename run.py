@@ -5,6 +5,7 @@ Usage:
   python run.py [--skip-scrape] [--skip-notify] [--skip-site] [--skip-x]
 """
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -120,11 +121,9 @@ def main():
 
     # --- 3. X 自動投稿 ---
     if not args.skip_x:
-        import os
         if os.environ.get("X_COOKIES") or (Path("data/x_cookies.json")).exists():
             print("=== Posting to X ===")
             from distribute.x_poster import post_to_x
-            from store.db import get_unposted, mark_posted
             unposted_x = get_unposted(conn, X_CHANNEL)
             if unposted_x:
                 x_list = [dict(row) for row in unposted_x]
