@@ -82,12 +82,18 @@ def get_unposted(conn: sqlite3.Connection, channel: str) -> list[sqlite3.Row]:
     """New products and changed products not yet posted to channel."""
     return conn.execute(
         """SELECT p.*,
-               CASE WHEN rc.source_code IS NOT NULL THEN 1 ELSE 0 END as has_change
+               CASE WHEN rc.source_code IS NOT NULL THEN 1 ELSE 0 END as has_change,
+               al_amazon.url as amazon_url,
+               al_rakuten.url as rakuten_url
            FROM products p
            LEFT JOIN (
                SELECT DISTINCT source_code FROM release_changes
                WHERE changed_at > datetime('now', '-1 day')
            ) rc ON p.source_code = rc.source_code
+           LEFT JOIN affiliate_links al_amazon
+               ON p.id = al_amazon.product_id AND al_amazon.asp = 'amazon'
+           LEFT JOIN affiliate_links al_rakuten
+               ON p.id = al_rakuten.product_id AND al_rakuten.asp = 'rakuten'
            WHERE p.id NOT IN (SELECT product_id FROM post_log WHERE channel = ?)
              AND (
                p.first_seen_at > datetime('now', '-1 day')
