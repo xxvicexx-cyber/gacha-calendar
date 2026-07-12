@@ -1,0 +1,107 @@
+---
+interface Product {
+  clean_name?: string | null;
+  name: string;
+  maker?: string | null;
+  ip_tag?: string | null;
+  play_price?: number | null;
+  is_reprint?: boolean;
+  overseas_ng?: boolean;
+  image_url?: string | null;
+  detail_url?: string | null;
+  amazon_url?: string | null;
+  rakuten_url?: string | null;
+  release_date?: string | null;
+}
+
+interface Props {
+  product: Product;
+  dateBadge?: string;
+}
+
+const { product: p, dateBadge } = Astro.props;
+
+function priceLabel(price: number | null | undefined) {
+  return price ? `${price}円` : '—';
+}
+---
+<div style="
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+">
+  {p.image_url && (
+    <div style="background: #f0f0f0; text-align: center; padding: 0.5rem; height: 160px; display: flex; align-items: center; justify-content: center; position: relative;">
+      {dateBadge && (
+        <span style="position: absolute; top: 0.4rem; left: 0.4rem; background: #e74c3c; color: white; font-size: 0.7rem; font-weight: bold; padding: 0.15rem 0.5rem; border-radius: 4px;">
+          {dateBadge}
+        </span>
+      )}
+      <img
+        src={p.image_url}
+        alt={p.clean_name || p.name}
+        style="max-height: 140px; max-width: 100%; object-fit: contain;"
+        loading="lazy"
+      />
+    </div>
+  )}
+  <div style="padding: 0.8rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
+    <div style="font-size: 0.75rem; color: #e74c3c; font-weight: bold;">
+      {p.maker ?? '—'}
+      {p.ip_tag && <span style="margin-left: 0.4rem; background: #fff3cd; color: #856404; padding: 0 0.3rem; border-radius: 3px; font-size: 0.7rem;">{p.ip_tag}</span>}
+    </div>
+
+    <a
+      href={p.detail_url ?? '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      style="font-size: 0.9rem; font-weight: bold; color: #333; text-decoration: none; line-height: 1.4;"
+    >
+      {p.clean_name || p.name}
+    </a>
+
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.2rem;">
+      <span style="background: #f8f0ff; color: #6f42c1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; font-weight: bold;">
+        {priceLabel(p.play_price)}
+      </span>
+      {p.is_reprint && (
+        <span style="background: #e8f4fd; color: #0969da; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem;">再販</span>
+      )}
+      {p.overseas_ng && (
+        <span style="background: #fff0f0; color: #cf222e; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem;">海外NG</span>
+      )}
+    </div>
+
+    {(p.amazon_url || p.rakuten_url) && (
+      <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem;">
+        {p.amazon_url && (
+          <a
+            href={p.amazon_url}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            style="
+              flex: 1; text-align: center; background: #FF9900; color: white;
+              padding: 0.35rem; border-radius: 4px; text-decoration: none;
+              font-size: 0.8rem; font-weight: bold;
+            "
+          >Amazon PR</a>
+        )}
+        {p.rakuten_url && (
+          <a
+            href={p.rakuten_url}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            style="
+              flex: 1; text-align: center; background: #bf0000; color: white;
+              padding: 0.35rem; border-radius: 4px; text-decoration: none;
+              font-size: 0.8rem; font-weight: bold;
+            "
+          >楽天 PR</a>
+        )}
+      </div>
+    )}
+  </div>
+</div>

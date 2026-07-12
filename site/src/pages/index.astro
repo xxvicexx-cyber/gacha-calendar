@@ -1,13 +1,44 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import ProductCard from '../components/ProductCard.astro';
 import indexData from '../data/index.json';
 
 const months = indexData.months ?? [];
 const generatedAt = indexData.generated_at ?? '';
+const totalCount = months.reduce((sum, m) => sum + m.count, 0);
 
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return `${y}年${parseInt(mo)}月`;
+}
+
+// 直近の発売予定(具体的な発売日が判明しているものを、当月〜翌々月から抽出)
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+
+const upcoming: any[] = [];
+for (const { month } of months.slice(0, 3)) {
+  try {
+    const mod = await import(`../data/${month}.json`);
+    for (const p of mod.default as any[]) {
+      if (!p.release_date) continue;
+      const d = new Date(p.release_date + 'T00:00:00');
+      if (d >= today) upcoming.push(p);
+    }
+  } catch {
+    // データ未生成の月はスキップ
+  }
+}
+upcoming.sort((a, b) => (a.release_date < b.release_date ? -1 : 1));
+const upcomingTop = upcoming.slice(0, 8);
+
+function dateBadgeLabel(dateStr: string) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86400000);
+  const label = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+  if (diffDays === 0) return `本日 ${label}`;
+  if (diffDays === 1) return `明日 ${label}`;
+  return label;
 }
 
 const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? '';
@@ -31,34 +62,79 @@ const structuredData = {
   })),
 };
 ---
-<Layout title="ガチャガチャ発売カレンダー | 最新ガチャ情報まとめ">
+<Layout
+  title="ガチャガチャ発売カレンダー | 最新カプセルトイ発売予定まとめ"
+  description={`ガチャガチャ・カプセルトイの発売予定を毎日自動更新。現在${totalCount}件の発売予定を掲載中。`}
+>
   <Fragment slot="structured-data">
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </Fragment>
-  <h2 style="margin-bottom: 1rem; font-size: 1.3rem;">📅 月別発売カレンダー</h2>
-  <p style="margin-bottom: 1.5rem; color: #666; font-size: 0.9rem;">
-    最終更新: {generatedAt ? new Date(generatedAt).toLocaleDateString('ja-JP') : '—'}
-  </p>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
-    {months.map(({ month, count }) => (
-      <a href={`/${month}/`} style="
-        background: white;
-        border-radius: 8px;
-        padding: 1.2rem;
-        text-decoration: none;
-        color: #333;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        display: block;
-        transition: box-shadow 0.2s;
-      ">
-        <div style="font-size: 1.1rem; font-weight: bold; color: #e74c3c;">{monthLabel(month)}</div>
-        <div style="margin-top: 0.3rem; color: #666; font-size: 0.9rem;">{count}件</div>
-      </a>
-    ))}
-  </div>
+  <section style="
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+    border-radius: 12px;
+    padding: 1.8rem 1.5rem;
+    margin-bottom: 1.5rem;
+  ">
+    <h2 style="font-size: 1.5rem; margin-bottom: 0.6rem;">今、発売予定のガチャガチャが一目でわかる</h2>
+    <p style="font-size: 0.95rem; opacity: 0.95; line-height: 1.7; max-width: 640px;">
+      新作カプセルトイの発売スケジュールを毎日自動収集し、月別カレンダーにまとめています。
+      メーカー・価格・発売日ごとに整理してあるので、気になるシリーズの発売日をサッと確認できます。
+    </p>
+    <div style="display: flex; gap: 1.5rem; margin-top: 1.2rem; flex-wrap: wrap;">
+      <div>
+        <div style="font-size: 1.6rem; font-weight: bold;">{totalCount.toLocaleString()}件</div>
+        <div style="font-size: 0.8rem; opacity: 0.85;">発売予定を掲載中</div>
+      </div>
+      <div>
+        <div style="font-size: 1.6rem; font-weight: bold;">{months.length}ヶ月分</div>
+        <div style="font-size: 0.8rem; opacity: 0.85;">先までカバー</div>
+      </div>
+      <div>
+        <div style="font-size: 1.6rem; font-weight: bold;">1日2回</div>
+        <div style="font-size: 0.8rem; opacity: 0.85;">自動更新</div>
+      </div>
+    </div>
+    <p style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.85;">
+      最終更新: {generatedAt ? new Date(generatedAt).toLocaleString('ja-JP', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+    </p>
+  </section>
 
-  {months.length === 0 && (
-    <p style="color: #888;">データがまだありません。スクレイパーを実行してください。</p>
+  {upcomingTop.length > 0 && (
+    <section style="margin-bottom: 2rem;">
+      <h2 style="font-size: 1.2rem; margin-bottom: 1rem;">🔜 まもなく発売</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+        {upcomingTop.map((p) => (
+          <ProductCard product={p} dateBadge={dateBadgeLabel(p.release_date)} />
+        ))}
+      </div>
+    </section>
   )}
+
+  <section>
+    <h2 style="margin-bottom: 1rem; font-size: 1.2rem;">📅 月別発売カレンダー</h2>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+      {months.map(({ month, count }) => (
+        <a href={`/${month}/`} style="
+          background: white;
+          border-radius: 8px;
+          padding: 1.2rem;
+          text-decoration: none;
+          color: #333;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+          display: block;
+          transition: box-shadow 0.2s;
+        ">
+          <div style="font-size: 1.1rem; font-weight: bold; color: #e74c3c;">{monthLabel(month)}</div>
+          <div style="margin-top: 0.3rem; color: #666; font-size: 0.9rem;">{count}件</div>
+        </a>
+      ))}
+    </div>
+
+    {months.length === 0 && (
+      <p style="color: #888;">データがまだありません。スクレイパーを実行してください。</p>
+    )}
+  </section>
 </Layout>
