@@ -1,0 +1,80 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import indexData from '../../data/index.json';
+
+export async function getStaticPaths() {
+  const months = indexData.months ?? [];
+  const byTag: Record<string, any[]> = {};
+
+  for (const { month } of months) {
+    const mod = await import(`../../data/${month}.json`);
+    for (const p of mod.default as any[]) {
+      if (!p.ip_tag) continue;
+      if (!byTag[p.ip_tag]) byTag[p.ip_tag] = [];
+      byTag[p.ip_tag].push(p);
+    }
+  }
+
+  return Object.entries(byTag).map(([tag, products]) => ({
+    params: { tag },
+    props: { tag, products },
+  }));
+}
+
+const { tag, products } = Astro.props as { tag: string; products: any[] };
+
+products.sort((a, b) => (a.release_date || a.release_month || '').localeCompare(b.release_date || b.release_month || ''));
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? '';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: `${tag} のガチャガチャ一覧`,
+  description: `${tag}関連のカプセルトイ ${products.length}件`,
+  url: `${siteUrl}/ip/${encodeURIComponent(tag)}/`,
+  numberOfItems: products.length,
+  itemListElement: products.map((p, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Product',
+      name: p.clean_name || p.name,
+      ...(p.image_url ? { image: p.image_url } : {}),
+      ...(p.maker ? { brand: { '@type': 'Brand', name: p.maker } } : {}),
+      url: p.detail_url || `${siteUrl}/ip/${encodeURIComponent(tag)}/`,
+      ...(p.play_price
+        ? { offers: { '@type': 'Offer', price: p.play_price, priceCurrency: 'JPY', availability: 'https://schema.org/PreOrder' } }
+        : {}),
+    },
+  })),
+};
+---
+<Layout
+  title={`${tag} のガチャガチャ一覧 | ガチャガチャ発売カレンダー`}
+  description={`${tag}関連のカプセルトイの発売予定 ${products.length}件をまとめました。`}
+>
+  <Fragment slot="structured-data">
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  </Fragment>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.8rem;">
+    <div>
+      <h2 style="font-size: 1.3rem;">🏷️ {tag} ({products.length}件)</h2>
+    </div>
+    <button
+      type="button"
+      class="follow-btn"
+      data-follow-type="ip"
+      data-follow-value={tag}
+      aria-pressed="false"
+      style="font-size: 0.85rem; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; padding: 0.4rem 0.8rem; cursor: pointer;"
+    >☆ フォロー</button>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+    {products.map((p) => (
+      <ProductCard product={p} dateBadge={p.release_date ?? p.release_month} />
+    ))}
+  </div>
+</Layout>

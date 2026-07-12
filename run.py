@@ -152,6 +152,9 @@ def generate_site_data(conn):
 
     out_dir = Path(__file__).parent / "site" / "src" / "data"
     out_dir.mkdir(parents=True, exist_ok=True)
+    # お気に入りページ等がクライアント側からfetchできるよう、公開静的ファイルとしても複製する
+    public_out_dir = Path(__file__).parent / "site" / "public" / "data"
+    public_out_dir.mkdir(parents=True, exist_ok=True)
 
     months = get_months(conn)
     all_data = {}
@@ -179,11 +182,11 @@ def generate_site_data(conn):
             })
         all_data[month] = products
 
-    # Write per-month JSON files
+    # Write per-month JSON files (build用のsrc/dataと、実行時fetch用のpublic/data両方に出力)
     for month, products in all_data.items():
-        (out_dir / f"{month}.json").write_text(
-            json.dumps(products, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        payload = json.dumps(products, ensure_ascii=False, indent=2)
+        (out_dir / f"{month}.json").write_text(payload, encoding="utf-8")
+        (public_out_dir / f"{month}.json").write_text(payload, encoding="utf-8")
 
     # Write index (months list + counts)
     index = {
@@ -193,6 +196,9 @@ def generate_site_data(conn):
         ],
     }
     (out_dir / "index.json").write_text(
+        json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (public_out_dir / "index.json").write_text(
         json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(f"Site data written: {len(months)} months, {sum(len(v) for v in all_data.values())} total products")

@@ -15,3 +15,4 @@ site/.astro/
 # スクレイパー生成物(run.pyで再生成される。データはコミットしない)
 site/src/data/*.json
 !site/src/data/.gitkeep
+site/public/data/

@@ -1,5 +1,8 @@
 ---
+import { buildIcsDataUri } from '../lib/ics';
+
 interface Product {
+  id?: number;
   clean_name?: string | null;
   name: string;
   maker?: string | null;
@@ -24,6 +27,15 @@ const { product: p, dateBadge } = Astro.props;
 function priceLabel(price: number | null | undefined) {
   return price ? `${price}円` : '—';
 }
+
+const icsHref = p.release_date
+  ? buildIcsDataUri({
+      uid: `product-${p.id ?? p.clean_name ?? p.name}`,
+      date: p.release_date,
+      title: p.clean_name || p.name,
+      url: p.detail_url ?? undefined,
+    })
+  : null;
 ---
 <div style="
   background: white;
@@ -49,9 +61,29 @@ function priceLabel(price: number | null | undefined) {
     </div>
   )}
   <div style="padding: 0.8rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem;">
-    <div style="font-size: 0.75rem; color: #e74c3c; font-weight: bold;">
-      {p.maker ?? '—'}
-      {p.ip_tag && <span style="margin-left: 0.4rem; background: #fff3cd; color: #856404; padding: 0 0.3rem; border-radius: 3px; font-size: 0.7rem;">{p.ip_tag}</span>}
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; flex-wrap: wrap;">
+      <div style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
+        {p.maker && (
+          <a href={`/maker/${encodeURIComponent(p.maker)}/`} style="color: #e74c3c; font-weight: bold; text-decoration: none;">
+            {p.maker}
+          </a>
+        )}
+        {p.ip_tag && (
+          <a href={`/ip/${encodeURIComponent(p.ip_tag)}/`} style="background: #fff3cd; color: #856404; padding: 0 0.3rem; border-radius: 3px; font-size: 0.7rem; text-decoration: none;">
+            {p.ip_tag}
+          </a>
+        )}
+      </div>
+      {p.maker && (
+        <button
+          type="button"
+          class="follow-btn"
+          data-follow-type="maker"
+          data-follow-value={p.maker}
+          aria-pressed="false"
+          style="font-size: 0.7rem; border: 1px solid #ddd; background: white; color: #666; border-radius: 4px; padding: 0.1rem 0.4rem; cursor: pointer; white-space: nowrap;"
+        >☆ フォロー</button>
+      )}
     </div>
 
     <a
@@ -75,8 +107,8 @@ function priceLabel(price: number | null | undefined) {
       )}
     </div>
 
-    {(p.amazon_url || p.rakuten_url) && (
-      <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem;">
+    {(p.amazon_url || p.rakuten_url || icsHref) && (
+      <div style="display: flex; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem; flex-wrap: wrap;">
         {p.amazon_url && (
           <a
             href={p.amazon_url}
@@ -85,7 +117,7 @@ function priceLabel(price: number | null | undefined) {
             style="
               flex: 1; text-align: center; background: #FF9900; color: white;
               padding: 0.35rem; border-radius: 4px; text-decoration: none;
-              font-size: 0.8rem; font-weight: bold;
+              font-size: 0.8rem; font-weight: bold; min-width: 80px;
             "
           >Amazon PR</a>
         )}
@@ -97,9 +129,21 @@ function priceLabel(price: number | null | undefined) {
             style="
               flex: 1; text-align: center; background: #bf0000; color: white;
               padding: 0.35rem; border-radius: 4px; text-decoration: none;
-              font-size: 0.8rem; font-weight: bold;
+              font-size: 0.8rem; font-weight: bold; min-width: 80px;
             "
           >楽天 PR</a>
+        )}
+        {icsHref && (
+          <a
+            href={icsHref}
+            download={`${(p.clean_name || p.name).slice(0, 30)}.ics`}
+            title="カレンダーに発売日を追加"
+            style="
+              text-align: center; background: #f0f0f0; color: #555;
+              padding: 0.35rem 0.5rem; border-radius: 4px; text-decoration: none;
+              font-size: 0.8rem; font-weight: bold; white-space: nowrap;
+            "
+          >📅</a>
         )}
       </div>
     )}

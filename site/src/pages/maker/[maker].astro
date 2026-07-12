@@ -1,0 +1,80 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import indexData from '../../data/index.json';
+
+export async function getStaticPaths() {
+  const months = indexData.months ?? [];
+  const byMaker: Record<string, any[]> = {};
+
+  for (const { month } of months) {
+    const mod = await import(`../../data/${month}.json`);
+    for (const p of mod.default as any[]) {
+      if (!p.maker) continue;
+      if (!byMaker[p.maker]) byMaker[p.maker] = [];
+      byMaker[p.maker].push(p);
+    }
+  }
+
+  return Object.entries(byMaker).map(([maker, products]) => ({
+    params: { maker },
+    props: { maker, products },
+  }));
+}
+
+const { maker, products } = Astro.props as { maker: string; products: any[] };
+
+products.sort((a, b) => (a.release_date || a.release_month || '').localeCompare(b.release_date || b.release_month || ''));
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? '';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: `${maker} のガチャガチャ一覧`,
+  description: `${maker}が発売するカプセルトイ ${products.length}件`,
+  url: `${siteUrl}/maker/${encodeURIComponent(maker)}/`,
+  numberOfItems: products.length,
+  itemListElement: products.map((p, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Product',
+      name: p.clean_name || p.name,
+      ...(p.image_url ? { image: p.image_url } : {}),
+      brand: { '@type': 'Brand', name: maker },
+      url: p.detail_url || `${siteUrl}/maker/${encodeURIComponent(maker)}/`,
+      ...(p.play_price
+        ? { offers: { '@type': 'Offer', price: p.play_price, priceCurrency: 'JPY', availability: 'https://schema.org/PreOrder' } }
+        : {}),
+    },
+  })),
+};
+---
+<Layout
+  title={`${maker} のガチャガチャ一覧 | ガチャガチャ発売カレンダー`}
+  description={`${maker}が発売するカプセルトイの発売予定 ${products.length}件をまとめました。`}
+>
+  <Fragment slot="structured-data">
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  </Fragment>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.8rem;">
+    <div>
+      <h2 style="font-size: 1.3rem;">🏭 {maker} ({products.length}件)</h2>
+    </div>
+    <button
+      type="button"
+      class="follow-btn"
+      data-follow-type="maker"
+      data-follow-value={maker}
+      aria-pressed="false"
+      style="font-size: 0.85rem; border: 1px solid #ddd; background: white; color: #666; border-radius: 6px; padding: 0.4rem 0.8rem; cursor: pointer;"
+    >☆ フォロー</button>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+    {products.map((p) => (
+      <ProductCard product={p} dateBadge={p.release_date ?? p.release_month} />
+    ))}
+  </div>
+</Layout>

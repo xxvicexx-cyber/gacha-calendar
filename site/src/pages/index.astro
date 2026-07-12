@@ -30,7 +30,9 @@ for (const { month } of months.slice(0, 3)) {
   }
 }
 upcoming.sort((a, b) => (a.release_date < b.release_date ? -1 : 1));
-const upcomingTop = upcoming.slice(0, 8);
+const todayStr = today.toISOString().slice(0, 10);
+const todayItems = upcoming.filter((p) => p.release_date === todayStr);
+const futureItems = upcoming.filter((p) => p.release_date !== todayStr).slice(0, 8);
 
 function dateBadgeLabel(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -101,11 +103,28 @@ const structuredData = {
     </p>
   </section>
 
-  {upcomingTop.length > 0 && (
+  {todayItems.length > 0 && (
+    <section style="
+      margin-bottom: 2rem;
+      background: #fffbea;
+      border: 2px solid #f9c74f;
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+    ">
+      <h2 style="font-size: 1.3rem; margin-bottom: 1rem; color: #b8860b;">🎉 本日発売！({todayItems.length}件)</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+        {todayItems.map((p) => (
+          <ProductCard product={p} dateBadge="本日発売" />
+        ))}
+      </div>
+    </section>
+  )}
+
+  {futureItems.length > 0 && (
     <section style="margin-bottom: 2rem;">
       <h2 style="font-size: 1.2rem; margin-bottom: 1rem;">🔜 まもなく発売</h2>
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
-        {upcomingTop.map((p) => (
+        {futureItems.map((p) => (
           <ProductCard product={p} dateBadge={dateBadgeLabel(p.release_date)} />
         ))}
       </div>

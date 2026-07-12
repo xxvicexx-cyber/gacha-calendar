@@ -70,6 +70,7 @@ const ogImageURL = new URL(image, Astro.site);
   </header>
   <nav>
     <a href="/">トップ</a>
+    <a href="/favorites">★ お気に入り</a>
     <a href="/about">このサイトについて</a>
   </nav>
   <main>
@@ -79,5 +80,60 @@ const ogImageURL = new URL(image, Astro.site);
     <p>当サイトはアフィリエイト広告（Amazon・楽天）を掲載しています。発売日は変更になる場合があります。<br>
     詳しくは<a href="/about">このサイトについて</a>をご覧ください。</p>
   </footer>
+  <script>
+    type Favorites = { makers: string[]; ips: string[] };
+    const STORAGE_KEY = 'gacha_favorites';
+
+    function loadFavorites(): Favorites {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return { makers: [], ips: [] };
+        const parsed = JSON.parse(raw);
+        return { makers: parsed.makers ?? [], ips: parsed.ips ?? [] };
+      } catch {
+        return { makers: [], ips: [] };
+      }
+    }
+
+    function saveFavorites(fav: Favorites) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fav));
+    }
+
+    function keyFor(type: string): 'makers' | 'ips' {
+      return type === 'maker' ? 'makers' : 'ips';
+    }
+
+    function applyFollowButtonState() {
+      const fav = loadFavorites();
+      document.querySelectorAll<HTMLButtonElement>('.follow-btn').forEach((btn) => {
+        const type = btn.dataset.followType ?? '';
+        const value = btn.dataset.followValue ?? '';
+        const active = fav[keyFor(type)].includes(value);
+        btn.setAttribute('aria-pressed', String(active));
+        btn.textContent = active ? '★ フォロー中' : '☆ フォロー';
+        btn.style.background = active ? '#fff3cd' : 'white';
+        btn.style.borderColor = active ? '#e0a800' : '#ddd';
+        btn.style.color = active ? '#856404' : '#666';
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.follow-btn');
+      if (!btn) return;
+      const type = btn.dataset.followType ?? '';
+      const value = btn.dataset.followValue ?? '';
+      if (!value) return;
+      const fav = loadFavorites();
+      const k = keyFor(type);
+      const idx = fav[k].indexOf(value);
+      if (idx >= 0) fav[k].splice(idx, 1);
+      else fav[k].push(value);
+      saveFavorites(fav);
+      applyFollowButtonState();
+    });
+
+    applyFollowButtonState();
+    document.addEventListener('astro:page-load', applyFollowButtonState);
+  </script>
 </body>
 </html>
