@@ -9,8 +9,32 @@ function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return `${y}年${parseInt(mo)}月`;
 }
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? '';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: 'ガチャガチャ発売カレンダー',
+  description: 'ガチャガチャ(カプセルトイ)の発売予定情報を月別カレンダー形式でまとめたサイト',
+  url: siteUrl + '/',
+  inLanguage: 'ja',
+  isPartOf: {
+    '@type': 'WebSite',
+    name: 'ガチャガチャ発売カレンダー',
+    url: siteUrl + '/',
+  },
+  hasPart: months.map(({ month, count }) => ({
+    '@type': 'CollectionPage',
+    name: `${monthLabel(month)} ガチャガチャ発売予定`,
+    url: `${siteUrl}/${month}/`,
+    about: `${monthLabel(month)}に発売予定のカプセルトイ ${count}件`,
+  })),
+};
 ---
 <Layout title="ガチャガチャ発売カレンダー | 最新ガチャ情報まとめ">
+  <Fragment slot="structured-data">
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  </Fragment>
   <h2 style="margin-bottom: 1rem; font-size: 1.3rem;">📅 月別発売カレンダー</h2>
   <p style="margin-bottom: 1.5rem; color: #666; font-size: 0.9rem;">
     最終更新: {generatedAt ? new Date(generatedAt).toLocaleDateString('ja-JP') : '—'}

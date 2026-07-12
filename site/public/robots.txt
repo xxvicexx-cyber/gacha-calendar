@@ -1,0 +1,44 @@
+# ガチャガチャ発売カレンダー
+# https://gacha-calendar-20p.pages.dev
+
+User-agent: *
+Allow: /
+
+# 検索エンジンのAI要約・生成回答向けクローラー
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://gacha-calendar-20p.pages.dev/sitemap-index.xml

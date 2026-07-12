@@ -7,6 +7,11 @@ __pycache__/
 node_modules/
 site/dist/
 site/.astro/
+.wrangler/
 *.db
 *.db-wal
 *.db-shm
+
+# スクレイパー生成物(run.pyで再生成される。データはコミットしない)
+site/src/data/*.json
+!site/src/data/.gitkeep

@@ -33,12 +33,47 @@ for (const p of products) {
   byDate[key].push(p);
 }
 const sortedDates = Object.keys(byDate).sort();
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? '';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: `${monthLabel(month)} ガチャガチャ発売予定一覧`,
+  description: `${monthLabel(month)}に発売予定のカプセルトイ・食玩 ${products.length}件`,
+  url: `${siteUrl}/${month}/`,
+  numberOfItems: products.length,
+  itemListElement: products.map((p, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Product',
+      name: p.clean_name || p.name,
+      ...(p.image_url ? { image: p.image_url } : {}),
+      ...(p.maker ? { brand: { '@type': 'Brand', name: p.maker } } : {}),
+      url: p.detail_url || `${siteUrl}/${month}/`,
+      ...(p.play_price
+        ? {
+            offers: {
+              '@type': 'Offer',
+              price: p.play_price,
+              priceCurrency: 'JPY',
+              availability: 'https://schema.org/PreOrder',
+              ...(p.release_date ? { availabilityStarts: p.release_date } : {}),
+            },
+          }
+        : {}),
+    },
+  })),
+};
 ---
 
 <Layout
   title={`${monthLabel(month)} ガチャガチャ発売予定一覧`}
   description={`${monthLabel(month)}に発売予定のカプセルトイ・食玩 ${products.length}件の情報をまとめました。`}
 >
+  <Fragment slot="structured-data">
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  </Fragment>
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
     <h2 style="font-size: 1.3rem;">🗓️ {monthLabel(month)} 発売予定 ({products.length}件)</h2>
     <a href="/" style="color: #e74c3c; text-decoration: none; font-size: 0.9rem;">← 月一覧へ</a>
