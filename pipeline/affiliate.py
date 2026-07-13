@@ -40,7 +40,7 @@ def amazon_search_url(keyword: str) -> str:
 def rakuten_search_url(keyword: str) -> str:
     encoded = urllib.parse.quote(keyword)
     base = f"https://search.rakuten.co.jp/search/mall/{encoded}/"
-    return _moshimo_wrap(base, "54", "67", "559")
+    return _moshimo_wrap(base, "54", "54", "616")
 
 
 def generate_links(clean_name: str, maker: str | None = None) -> dict[str, str]:
