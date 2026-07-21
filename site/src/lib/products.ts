@@ -1,0 +1,79 @@
+export interface Product {
+  id: number;
+  clean_name: string | null;
+  name: string;
+  maker: string | null;
+  ip_tag: string | null;
+  play_price: number | null;
+  is_reprint: boolean;
+  overseas_ng: boolean;
+  image_url: string | null;
+  detail_url: string | null;
+  amazon_url: string | null;
+  rakuten_url: string | null;
+  release_date: string | null;
+  release_month: string | null;
+}
+
+/** index.json記載の全月分をfetchしてフラットな配列にする（クライアント側専用ページで使用） */
+export async function fetchAllProducts(): Promise<Product[]> {
+  const indexRes = await fetch('/data/index.json');
+  const index = await indexRes.json();
+  const months: string[] = (index.months ?? []).map((m: { month: string }) => m.month);
+
+  const monthData = await Promise.all(
+    months.map((m) => fetch(`/data/${m}.json`).then((r) => (r.ok ? r.json() : []))),
+  );
+  return monthData.flat();
+}
+
+export function priceLabel(price: number | null): string {
+  return price ? `${price}円` : '—';
+}
+
+export function sortByRelease(products: Product[]): Product[] {
+  return [...products].sort((a, b) =>
+    (a.release_date || a.release_month || '').localeCompare(b.release_date || b.release_month || ''),
+  );
+}
+
+export function renderCard(p: Product): string {
+  const title = p.clean_name || p.name;
+  const badges = [
+    `<span style="background:#f8f0ff;color:#6f42c1;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.75rem;font-weight:bold;">${priceLabel(p.play_price)}</span>`,
+    p.is_reprint ? `<span style="background:#e8f4fd;color:#0969da;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.75rem;">再販</span>` : '',
+    p.overseas_ng ? `<span style="background:#fff0f0;color:#cf222e;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.75rem;">海外NG</span>` : '',
+  ].join('');
+  const dateLabel = p.release_date || p.release_month || '';
+  const img = p.image_url
+    ? `<div style="background:#f0f0f0;text-align:center;padding:0.5rem;height:160px;display:flex;align-items:center;justify-content:center;position:relative;">
+        ${dateLabel ? `<span style="position:absolute;top:0.4rem;left:0.4rem;background:#e74c3c;color:white;font-size:0.7rem;font-weight:bold;padding:0.15rem 0.5rem;border-radius:4px;">${dateLabel}</span>` : ''}
+        <img src="${p.image_url}" alt="${title}" style="max-height:140px;max-width:100%;object-fit:contain;" loading="lazy" />
+      </div>`
+    : '';
+  const buttons = [
+    p.amazon_url ? `<a href="${p.amazon_url}" target="_blank" rel="noopener noreferrer sponsored" style="flex:1;text-align:center;background:#FF9900;color:white;padding:0.35rem;border-radius:4px;text-decoration:none;font-size:0.8rem;font-weight:bold;min-width:80px;">Amazon PR</a>` : '',
+    p.rakuten_url ? `<a href="${p.rakuten_url}" target="_blank" rel="noopener noreferrer sponsored" style="flex:1;text-align:center;background:#bf0000;color:white;padding:0.35rem;border-radius:4px;text-decoration:none;font-size:0.8rem;font-weight:bold;min-width:80px;">楽天 PR</a>` : '',
+  ].join('');
+  const followBtn = p.maker
+    ? `<button type="button" class="follow-btn" data-follow-type="maker" data-follow-value="${p.maker}" aria-pressed="false" style="font-size:0.7rem;border:1px solid #ddd;background:white;color:#666;border-radius:4px;padding:0.1rem 0.4rem;cursor:pointer;white-space:nowrap;">☆ フォロー</button>`
+    : '';
+
+  return `
+    <div style="background:white;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.1);overflow:hidden;display:flex;flex-direction:column;">
+      ${img}
+      <div style="padding:0.8rem;flex:1;display:flex;flex-direction:column;gap:0.3rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.4rem;flex-wrap:wrap;">
+          <div style="font-size:0.75rem;color:#e74c3c;font-weight:bold;">
+            ${p.maker ?? '—'}
+            ${p.ip_tag ? `<span style="margin-left:0.4rem;background:#fff3cd;color:#856404;padding:0 0.3rem;border-radius:3px;font-size:0.7rem;">${p.ip_tag}</span>` : ''}
+          </div>
+          ${followBtn}
+        </div>
+        <a href="${p.detail_url ?? '#'}" target="_blank" rel="noopener noreferrer" style="font-size:0.9rem;font-weight:bold;color:#333;text-decoration:none;line-height:1.4;">${title}</a>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.2rem;">${badges}</div>
+        ${buttons ? `<div style="display:flex;gap:0.5rem;margin-top:auto;padding-top:0.5rem;flex-wrap:wrap;">${buttons}</div>` : ''}
+      </div>
+    </div>
+  `;
+}

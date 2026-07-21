@@ -1,0 +1,111 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout
+  title="検索 | ガチャガチャ発売カレンダー"
+  description="商品名・メーカー・シリーズ名でガチャガチャの発売予定を検索できます。"
+>
+  <h2 style="font-size: 1.3rem; margin-bottom: 1rem;">🔍 検索</h2>
+
+  <input
+    id="search-input"
+    type="search"
+    placeholder="商品名・メーカー・シリーズ名で検索（例: すみっコぐらし）"
+    autocomplete="off"
+    style="
+      width: 100%;
+      font-size: 1rem;
+      padding: 0.7rem 0.9rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      margin-bottom: 1rem;
+    "
+  />
+
+  <p id="search-status" style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">読み込み中...</p>
+
+  <div id="search-results" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;"></div>
+</Layout>
+
+<script>
+  import { fetchAllProducts, renderCard, sortByRelease, type Product } from '../lib/products';
+
+  const input = document.getElementById('search-input') as HTMLInputElement;
+  const statusEl = document.getElementById('search-status')!;
+  const resultsEl = document.getElementById('search-results')!;
+
+  const MAX_RESULTS = 60;
+
+  function normalize(s: string): string {
+    return s.normalize('NFKC').toLowerCase();
+  }
+
+  function matches(p: Product, terms: string[]): boolean {
+    const haystack = normalize([p.clean_name, p.name, p.maker, p.ip_tag].filter(Boolean).join(' '));
+    return terms.every((t) => haystack.includes(t));
+  }
+
+  function render(products: Product[] | null, query: string) {
+    if (!products) {
+      statusEl.textContent = 'データの取得に失敗しました。時間をおいて再度お試しください。';
+      resultsEl.innerHTML = '';
+      return;
+    }
+
+    if (!query.trim()) {
+      statusEl.textContent = '商品名・メーカー・シリーズ名を入力してください。';
+      resultsEl.innerHTML = '';
+      return;
+    }
+
+    const terms = normalize(query).split(/\s+/).filter(Boolean);
+    const matched = sortByRelease(products.filter((p) => matches(p, terms)));
+
+    if (matched.length === 0) {
+      statusEl.textContent = `「${query}」に一致する商品は見つかりませんでした。`;
+      resultsEl.innerHTML = '';
+      return;
+    }
+
+    statusEl.textContent = `「${query}」の検索結果: ${matched.length}件${matched.length > MAX_RESULTS ? `（上位${MAX_RESULTS}件を表示）` : ''}`;
+    resultsEl.innerHTML = matched.slice(0, MAX_RESULTS).map(renderCard).join('');
+  }
+
+  let allProducts: Product[] | null = null;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function runSearch() {
+    const query = input.value;
+    const url = new URL(location.href);
+    if (query.trim()) url.searchParams.set('q', query);
+    else url.searchParams.delete('q');
+    history.replaceState(null, '', url);
+    render(allProducts, query);
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runSearch, 150);
+  });
+
+  async function main() {
+    const initialQuery = new URL(location.href).searchParams.get('q') ?? '';
+    input.value = initialQuery;
+    if (initialQuery.trim()) {
+      statusEl.textContent = '読み込み中...';
+    } else {
+      statusEl.textContent = '商品名・メーカー・シリーズ名を入力してください。';
+    }
+
+    try {
+      allProducts = await fetchAllProducts();
+    } catch (err) {
+      allProducts = null;
+      console.error(err);
+    }
+    render(allProducts, input.value);
+  }
+
+  main();
+</script>
