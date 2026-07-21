@@ -1,51 +1,108 @@
-"""Generate affiliate search links for Amazon/Rakuten via もしもアフィリエイト."""
+"""Generate affiliate links for Amazon (direct, tag-based) and Rakuten (Rakuten Web Service).
+
+2026-07-21: もしもアフィリエイトのサイト登録が削除されたため、もしも経由のURLラップをやめ、
+Amazonは直接タグ付きリンク、楽天は楽天ウェブサービス「楽天市場商品検索API」を直接叩いて
+アフィリエイトURLを取得する方式に切り替えた（manga-calプロジェクトの楽天ブックスAPI連携と
+同じ認証方式: RAKUTEN_APP_ID + RAKUTEN_ACCESS_KEY + RAKUTEN_AFFILIATE_ID）。
+
+楽天APIは実際のHTTPリクエストが発生する(レート制限あり、目安1req/秒)ため、既にDBに保存済みの
+URLがある商品については呼び出し側(run.py)で再取得をスキップすること。
+"""
 import os
+import time
 import urllib.parse
 
-MOSHIMO_RAKUTEN_PRODUCT_ID = "54"
-MOSHIMO_AMAZON_PRODUCT_ID = "170"
+import httpx
+
+RAKUTEN_SEARCH_URL = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701"
+RAKUTEN_MIN_INTERVAL_SEC = 1.1
+
+# 楽天ウェブサービスのアプリ登録をドメイン制限した「Webアプリケーション」タイプで行った場合、
+# サーバーサイドからの素のリクエストは拒否されることがある(manga-calプロジェクトで実機確認済み)。
+# 登録済みドメインのReferer/Originを付与して回避する。
+REGISTERED_ORIGIN = "https://gacha-calendar-20p.pages.dev"
+BROWSER_LIKE_HEADERS = {
+    "Referer": f"{REGISTERED_ORIGIN}/",
+    "Origin": REGISTERED_ORIGIN,
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+}
+
+_last_rakuten_call = 0.0
 
 
 def _amazon_tag() -> str:
     return os.environ.get("AMAZON_AFFILIATE_TAG", "")
 
 
-def _moshimo_id() -> str:
-    return os.environ.get("MOSHIMO_AFFILIATE_ID", "")
-
-
-def _moshimo_wrap(url: str, moshimo_p_id: str, moshimo_pc_id: str, moshimo_pl_id: str) -> str:
-    if not _moshimo_id():
-        return url
-    base = "https://af.moshimo.com/af/c/click"
-    params = {
-        "a_id": _moshimo_id(),
-        "p_id": moshimo_p_id,
-        "pc_id": moshimo_pc_id,
-        "pl_id": moshimo_pl_id,
-        "url": url,
-    }
-    return f"{base}?{urllib.parse.urlencode(params)}"
+def _rakuten_creds() -> tuple[str, str, str]:
+    return (
+        os.environ.get("RAKUTEN_APP_ID", ""),
+        os.environ.get("RAKUTEN_ACCESS_KEY", ""),
+        os.environ.get("RAKUTEN_AFFILIATE_ID", ""),
+    )
 
 
 def amazon_search_url(keyword: str) -> str:
     query = urllib.parse.quote(keyword)
-    base = f"https://www.amazon.co.jp/s?k={query}"
+    url = f"https://www.amazon.co.jp/s?k={query}"
     tag = _amazon_tag()
     if tag:
-        base += f"&tag={tag}"
-    return _moshimo_wrap(base, "170", "185", "4062")
+        url += f"&tag={tag}"
+    return url
+
+
+def _rakuten_plain_search_url(keyword: str) -> str:
+    """API呼び出しができない/失敗した場合の非アフィリエイトフォールバック。"""
+    encoded = urllib.parse.quote(keyword)
+    return f"https://search.rakuten.co.jp/search/mall/{encoded}/"
 
 
 def rakuten_search_url(keyword: str) -> str:
-    encoded = urllib.parse.quote(keyword)
-    base = f"https://search.rakuten.co.jp/search/mall/{encoded}/"
-    return _moshimo_wrap(base, "54", "54", "616")
+    """楽天市場商品検索APIでkeyword検索し、最上位商品のアフィリエイトURLを返す。
+    認証情報未設定・該当なし・APIエラー時は非アフィリエイトの検索URLにフォールバックする
+    (リンク自体は常に返す。呼び出し側でNoneを気にしなくてよいようにするため)。
+    """
+    app_id, access_key, affiliate_id = _rakuten_creds()
+    if not app_id or not access_key:
+        return _rakuten_plain_search_url(keyword)
+
+    global _last_rakuten_call
+    elapsed = time.monotonic() - _last_rakuten_call
+    if elapsed < RAKUTEN_MIN_INTERVAL_SEC:
+        time.sleep(RAKUTEN_MIN_INTERVAL_SEC - elapsed)
+
+    params = {
+        "applicationId": app_id,
+        "accessKey": access_key,
+        "keyword": keyword,
+        "hits": 1,
+        "sort": "standard",
+    }
+    if affiliate_id:
+        params["affiliateId"] = affiliate_id
+
+    try:
+        resp = httpx.get(RAKUTEN_SEARCH_URL, params=params, headers=BROWSER_LIKE_HEADERS, timeout=10)
+        _last_rakuten_call = time.monotonic()
+        resp.raise_for_status()
+        data = resp.json()
+        items = data.get("Items") or []
+        if not items:
+            return _rakuten_plain_search_url(keyword)
+        item = items[0].get("Item", {})
+        return item.get("affiliateUrl") or item.get("itemUrl") or _rakuten_plain_search_url(keyword)
+    except Exception:
+        _last_rakuten_call = time.monotonic()
+        return _rakuten_plain_search_url(keyword)
 
 
-def generate_links(clean_name: str, maker: str | None = None) -> dict[str, str]:
+def generate_links(clean_name: str, maker: str | None = None, existing_rakuten_url: str | None = None) -> dict[str, str]:
+    """existing_rakuten_url: DBに既に保存済みの楽天URLがあれば渡す。API再呼び出しをスキップする
+    (呼び出し側=run.pyが日次パイプラインで全件を毎回舐めるため、既存商品への再検索を避けてレート制限・
+    実行時間を抑える)。"""
     keyword = f"{maker} {clean_name}".strip() if maker else clean_name
+    rakuten = existing_rakuten_url or rakuten_search_url(keyword)
     return {
         "amazon": amazon_search_url(keyword),
-        "rakuten": rakuten_search_url(keyword),
+        "rakuten": rakuten,
     }

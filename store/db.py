@@ -120,6 +120,13 @@ def upsert_affiliate(conn: sqlite3.Connection, product_id: int, asp: str, url: s
     )
 
 
+def get_affiliate_url(conn: sqlite3.Connection, product_id: int, asp: str) -> str | None:
+    row = conn.execute(
+        "SELECT url FROM affiliate_links WHERE product_id=? AND asp=?", (product_id, asp),
+    ).fetchone()
+    return row["url"] if row else None
+
+
 def get_products_by_month(conn: sqlite3.Connection, month: str) -> list[sqlite3.Row]:
     """month: 'YYYY-MM'"""
     return conn.execute(

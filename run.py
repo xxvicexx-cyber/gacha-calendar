@@ -22,7 +22,7 @@ from scrapers.base import BaseScraper
 from pipeline.normalize import parse_item_name
 from pipeline.affiliate import generate_links
 from store.db import (
-    init_db, get_conn, upsert_product, upsert_affiliate,
+    init_db, get_conn, upsert_product, upsert_affiliate, get_affiliate_url,
     get_unposted, mark_posted, get_products_by_month, get_months,
 )
 from distribute.discord import post_to_discord, CHANNEL
@@ -56,8 +56,14 @@ def process_items(raw_items: list[dict], conn) -> list[tuple]:
 
         product_id, is_new, changes = upsert_product(conn, product)
 
-        # Generate affiliate links
-        links = generate_links(product["clean_name"], product["maker"])
+        # Generate affiliate links. 楽天は実APIコール(レート制限あり)なので、
+        # 既にDBにURLがある商品は再取得せず使い回す(毎回全件を舐める日次パイプラインのため)。
+        # ただしもしもアフィリエイト経由の旧URL(2026-07-21廃止済み)が残っている場合は
+        # 壊れたリンクなので再取得対象として扱う。
+        existing_rakuten = get_affiliate_url(conn, product_id, "rakuten")
+        if existing_rakuten and "moshimo.com" in existing_rakuten:
+            existing_rakuten = None
+        links = generate_links(product["clean_name"], product["maker"], existing_rakuten_url=existing_rakuten)
         for asp, url in links.items():
             upsert_affiliate(conn, product_id, asp, url)
 
