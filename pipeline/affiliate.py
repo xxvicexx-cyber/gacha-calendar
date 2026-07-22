@@ -57,14 +57,10 @@ def _rakuten_plain_search_url(keyword: str) -> str:
     return f"https://search.rakuten.co.jp/search/mall/{encoded}/"
 
 
-def rakuten_search_url(keyword: str) -> str:
-    """楽天市場商品検索APIでkeyword検索し、最上位商品のアフィリエイトURLを返す。
-    認証情報未設定・該当なし・APIエラー時は非アフィリエイトの検索URLにフォールバックする
-    (リンク自体は常に返す。呼び出し側でNoneを気にしなくてよいようにするため)。
-    """
+def _rakuten_api_search(keyword: str) -> str | None:
+    """楽天市場商品検索APIを1回呼び出す。ヒットすればaffiliateUrl(無ければitemUrl)を返す。
+    ノーヒット/APIエラー時はNoneを返す(呼び出し側で別キーワードでの再試行に使うため)。"""
     app_id, access_key, affiliate_id = _rakuten_creds()
-    if not app_id or not access_key:
-        return _rakuten_plain_search_url(keyword)
 
     global _last_rakuten_call
     elapsed = time.monotonic() - _last_rakuten_call
@@ -88,12 +84,34 @@ def rakuten_search_url(keyword: str) -> str:
         data = resp.json()
         items = data.get("Items") or []
         if not items:
-            return _rakuten_plain_search_url(keyword)
+            return None
         item = items[0].get("Item", {})
-        return item.get("affiliateUrl") or item.get("itemUrl") or _rakuten_plain_search_url(keyword)
+        return item.get("affiliateUrl") or item.get("itemUrl") or None
     except Exception:
         _last_rakuten_call = time.monotonic()
-        return _rakuten_plain_search_url(keyword)
+        return None
+
+
+def rakuten_search_url(clean_name: str, maker: str | None = None) -> str:
+    """楽天市場商品検索APIで商品を検索し、最上位商品のアフィリエイトURLを返す。
+
+    実データで確認した重要な挙動: メーカー名を検索語に含めると逆にヒットしなくなるケースが多い
+    (例: 「タカラトミーアーツ JOGUMAN もふもふポーシェット」は0件だが、
+    「JOGUMAN もふもふポーシェット」単体だと10件ヒットする。楽天の出品者はメーカーの正式社名を
+    商品名に含めないことが多いため)。そのため、まず商品名単体で検索し、ヒットしなければ
+    メーカー名付きで再試行する(逆に商品名単体だと一般的すぎる場合に効くことがある)。
+    どちらもヒットしない/認証情報未設定/APIエラー時は非アフィリエイトの検索URLにフォールバックする
+    (リンク自体は常に返す。呼び出し側でNoneを気にしなくてよいようにするため)。
+    """
+    app_id, access_key, _ = _rakuten_creds()
+    combined = f"{maker} {clean_name}".strip() if maker else clean_name
+    if not app_id or not access_key:
+        return _rakuten_plain_search_url(combined)
+
+    url = _rakuten_api_search(clean_name)
+    if not url and maker:
+        url = _rakuten_api_search(combined)
+    return url or _rakuten_plain_search_url(combined)
 
 
 def generate_links(clean_name: str, maker: str | None = None, existing_rakuten_url: str | None = None) -> dict[str, str]:
@@ -101,7 +119,7 @@ def generate_links(clean_name: str, maker: str | None = None, existing_rakuten_u
     (呼び出し側=run.pyが日次パイプラインで全件を毎回舐めるため、既存商品への再検索を避けてレート制限・
     実行時間を抑える)。"""
     keyword = f"{maker} {clean_name}".strip() if maker else clean_name
-    rakuten = existing_rakuten_url or rakuten_search_url(keyword)
+    rakuten = existing_rakuten_url or rakuten_search_url(clean_name, maker)
     return {
         "amazon": amazon_search_url(keyword),
         "rakuten": rakuten,
