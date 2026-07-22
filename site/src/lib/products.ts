@@ -70,7 +70,7 @@ export function renderCard(p: Product): string {
           </div>
           ${followBtn}
         </div>
-        <a href="${p.detail_url ?? '#'}" target="_blank" rel="noopener noreferrer" style="font-size:0.9rem;font-weight:bold;color:#333;text-decoration:none;line-height:1.4;">${title}</a>
+        <span style="font-size:0.9rem;font-weight:bold;color:#333;line-height:1.4;">${title}</span>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.2rem;">${badges}</div>
         ${buttons ? `<div style="display:flex;gap:0.5rem;margin-top:auto;padding-top:0.5rem;flex-wrap:wrap;">${buttons}</div>` : ''}
       </div>
