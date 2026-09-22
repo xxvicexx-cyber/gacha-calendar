@@ -1,0 +1,24 @@
+name: Keepalive
+
+# GitHubは60日間pushがないリポジトリのスケジュール実行ワークフローを自動的に
+# 無効化する。このリポジトリの本来の定期実行(cron)は外部API/DB/デプロイのみで
+# git pushを伴わないため、この空コミットで「push実績」を作り自動無効化を防ぐ。
+on:
+  schedule:
+    - cron: '0 3 1 * *'  # 毎月1日 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Empty commit to prevent 60-day workflow auto-disable
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive (prevent scheduled workflow auto-disable)"
+          git push
